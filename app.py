@@ -37,10 +37,9 @@ if st.button("✨ Generate 20 Questions via AI") or st.session_state["quiz_data"
             try:
                 response = model.generate_content(prompt)
                 t = response.text.strip()
-                if t.startswith("
-```"):
-                    t = t.split("\n", 1)[1].rsplit("\n", 1)[0]
-                st.session_state["quiz_data"] = json.loads(t.strip())[:20]
+                t = t.replace("```json", "").replace("
+```", "").strip()
+                st.session_state["quiz_data"] = json.loads(t)[:20]
             except Exception as e:
                 st.error("AI đang bận một chút, bạn bấm nút Thử lại nhé!")
                 st.session_state["quiz_data"] = None
