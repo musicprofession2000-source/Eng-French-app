@@ -1,71 +1,27 @@
 import streamlit as st
 import google.generativeai as genai
-import json
 
-# Cấu hình bộ não AI Gemini bằng mã API của bạn
+# Cấu hình AI
 genai.configure(api_key="AQ.Ab8RN6JRsOmxntayqxNpPYGem--6FGxfLsu0MkzTcUm2t5orfA")
+model = genai.GenerativeModel('gemini-1.5-flash')
 
-st.title("🇫🇷 French Practice App (AI Powered)")
-st.write("AI will generate 20 vocabulary questions first to prepare you for the conversation!")
+st.title("🇫🇷 App Luyện Tiếng Pháp")
 
-st.markdown("---")
+# Chọn cấu hình
+topic = st.selectbox("Chọn chủ đề:", ["At the Pharmacy", "Job Interview", "At the Restaurant"])
+if st.button("Bắt đầu trò chuyện"):
+    st.session_state["chat"] = True
 
-# Chọn chủ đề
-topic = st.selectbox(
-    "👉 Choose a topic to practice:",
-    ["At the Pharmacy", "Job Interview", "At the Restaurant", "At the Airport", "Booking a Hotel"]
-)
-
-if "quiz_data" not in st.session_state:
-    st.session_state["quiz_data"] = None
-if "current_topic" not in st.session_state:
-    st.session_state["current_topic"] = topic
-
-# Nếu đổi chủ đề thì xóa dữ liệu cũ để AI tạo bộ đề mới
-if st.session_state["current_topic"] != topic:
-    st.session_state["current_topic"] = topic
-    st.session_state["quiz_data"] = None
-    if "submitted" in st.session_state: del st.session_state["submitted"]
-
-# Nút bấm bắt đầu tạo đề bằng AI
-if st.button("✨ Generate 20 Questions via AI") or st.session_state["quiz_data"] is not None:
+if st.session_state.get("chat"):
+    st.write("Chào bạn! Hãy gõ tiếng Pháp để luyện tập nhé:")
+    if "messages" not in st.session_state: st.session_state["messages"] = []
     
-    if st.session_state["quiz_data"] is None:
-        with st.spinner("AI is generating 20 custom questions for your topic... Please wait..."):
-            model = genai.GenerativeModel('gemini-pro')
-            prompt = f"Generate exactly 20 multiple-choice questions to test English speakers learning French vocabulary and phrases for the topic: '{topic}'. Return ONLY a valid JSON array of objects, with no markdown formatting, no ```json tags. Each object must have exactly these keys: 'q' (the question in English), 'a' (list of 4 options in French/English), 'c' (the exact correct option from the list)."
-            try:
-                response = model.generate_content(prompt)
-                t = response.text.strip()
-                # Cách xử lý mới dùng chuỗi viết liền, loại bỏ hoàn toàn việc ngắt dòng
-                t = t.strip("`").strip("json").strip()
-                st.session_state["quiz_data"] = json.loads(t)[:20]
-            except Exception as e:
-                st.error("AI đang bận một chút, bạn bấm nút Thử lại nhé!")
-                st.session_state["quiz_data"] = None
-
-    if st.session_state["quiz_data"]:
-        st.subheader(f"📝 Vocabulary Warm-up: {topic}")
-        user_answers = []
+    for msg in st.session_state["messages"]:
+        with st.chat_message(msg["role"]): st.write(msg["text"])
         
-        # Hiện 20 câu hỏi ra màn hình
-        for i, item in enumerate(st.session_state["quiz_data"]):
-            ans = st.radio(f"Question {i+1}: {item['q']}", item['a'], index=None, key=f"ai_q_{i}")
-            user_answers.append(ans)
-            st.markdown("---")
-            
-        if st.button("Submit Answers"):
-            st.session_state["submitted"] = True
-            
-        if st.session_state.get("submitted"):
-            score = sum(1 for i, item in enumerate(st.session_state["quiz_data"]) if user_answers[i] == item['c'])
-            percentage = (score / len(st.session_state["quiz_data"])) * 100
-            st.write(f"### Your Score: {score} / {len(st.session_state['quiz_data'])} ({percentage:.1f}%)")
-            
-            if percentage >= 70:
-                st.success("🎉 Excellent! You passed the vocabulary preparation! The AI Chat Roleplay for this topic is now unlocked below!")
-                st.markdown("### 💬 AI Roleplay Chatbot")
-                st.info(f"AI will now start a conversation with you about '{topic}' using the vocabulary you just practiced!")
-                st.chat_input("Type your French response here...")
-            else:
-                st.error("❌ You need at least 70% to unlock the conversation. Please check your answers and try again!")
+    user_text = st.chat_input("Gõ tại đây...")
+    if user_text:
+        st.session_state["messages"].append({"role": "user", "text": user_text})
+        res = model.generate_content(f"Talk about {topic}. Reply in French and translate to English. User said: {user_text}")
+        st.session_state["messages"].append({"role": "assistant", "text": res.text})
+        st.rerun()
