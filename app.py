@@ -4,43 +4,44 @@ import json
 from gtts import gTTS
 import io
 
-# Cấu hình API
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-2.5-flash')
 
 st.set_page_config(page_title="Apprentissage du Français", layout="wide")
 st.title("🇫🇷 Application d'Apprentissage du Français")
 
-# Sidebar: Dictionnaire
+# Sidebar
 st.sidebar.title("📚 Dictionnaire")
 word = st.sidebar.text_input("Chercher un mot:")
 if word:
     try:
-        res = model.generate_content(f"Explique le mot '{word}' en français simple avec des exemples.")
+        res = model.generate_content(f"Explique le mot '{word}' en français.")
         st.sidebar.info(res.text)
     except: pass
 
-# Cấu hình
+# Settings
 col1, col2, col3 = st.columns(3)
 level = col1.selectbox("Niveau:", ["A2", "B1", "B2", "C1"])
 role = col2.selectbox("Rôle de l'IA:", ["Employé", "Client", "Ami"])
 topics = ["At the Pharmacy", "Job Interview", "At the Restaurant", "At the Airport", "Booking a Hotel",
-          "Asking for Directions", "At the Supermarket", "Doctor's Appointment", "At the Bank", "Renting an Apartment"]
+          "Asking for Directions", "At the Supermarket", "Doctor's Appointment", "At the Bank", "Renting an Apartment",
+          "Buying a Train Ticket", "At the Post Office", "Shopping for Clothes", "At the Gym", "Hobbies",
+          "At the Library", "Ordering Coffee", "At the Hair Salon", "Planning a Trip", "Introducing Yourself",
+          "Reporting a Lost Item", "At the Museum", "Talking about Weather", "Discussing a Movie", "In a Taxi",
+          "Job Review", "Tech Support", "Birthday Party", "Dinner Plans", "Daily Routine"]
 topic = col3.selectbox("Sujet:", topics)
 
 if "chat" not in st.session_state: st.session_state["chat"] = []
 if "unlocked" not in st.session_state: st.session_state["unlocked"] = False
 if "quiz" not in st.session_state: st.session_state["quiz"] = None
 
-# Quiz (đã sửa lệnh để bắt AI viết tiếng Pháp)
-if st.button("✨ Générer 20 questions (en français)"):
+# Quiz
+if st.button("✨ Générer 20 questions"):
     with st.spinner("Génération..."):
         try:
-            # Lệnh bắt buộc AI phải viết hoàn toàn bằng tiếng Pháp
-            prompt = f"Générez 20 questions à choix multiples pour le sujet '{topic}', niveau {level}. TOUTES les questions et réponses doivent être en FRANÇAIS. Retournez UNIQUEMENT un tableau JSON avec les clés: q, a, c."
+            prompt = f"Générez 20 questions MCQ en français pour le sujet '{topic}', niveau {level}. Retournez UNIQUEMENT un JSON array avec les clés: q, a, c."
             res = model.generate_content(prompt)
-            text = res.text.replace('json', '').replace('`', '').strip()
-            st.session_state["quiz"] = json.loads(text)
+            st.session_state["quiz"] = json.loads(res.text.strip().replace("json", "").replace("`", ""))
             st.rerun()
         except Exception as e: st.error(f"Erreur: {e}")
 
@@ -50,11 +51,11 @@ if st.session_state["quiz"]:
         if sum(1 for i, q in enumerate(st.session_state["quiz"]) if answers[i] == q['c']) >= 14:
             st.session_state["unlocked"] = True
             st.success("Accès au Chat débloqué !")
-        else: st.error("Besoin de 14/20 pour débloquer.")
+        else: st.error("Besoin de 14/20.")
 
 # Chat
 if st.session_state["unlocked"]:
-    st.header("💬 Salle de Chat & Voix")
+    st.header("💬 Salle de Chat")
     for msg in st.session_state["chat"]:
         with st.chat_message(msg["role"]): st.markdown(msg["text"])
     
