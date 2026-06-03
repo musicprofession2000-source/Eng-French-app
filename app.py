@@ -33,18 +33,14 @@ if st.button("✨ Generate 20 Questions via AI") or st.session_state["quiz_data"
     if st.session_state["quiz_data"] is None:
         with st.spinner("AI is generating 20 custom questions for your topic... Please wait..."):
             model = genai.GenerativeModel('gemini-pro')
-            # Lệnh bắt AI đẻ đúng 20 câu hỏi phục vụ bài nói chuyện
-            prompt = f"""
-            Generate exactly 20 multiple-choice questions to test English speakers learning French vocabulary and phrases specifically for the topic: '{topic}'. 
-            These 20 questions must serve as a preparation (warm-up) for a real-life conversation roleplay about this topic later.
-            Return ONLY a valid JSON array of objects, with no markdown formatting, no ```json tags. 
-            Each object must have exactly these keys: 'q' (the question in English), 'a' (list of 4 options in French/English), 'c' (the exact correct option from the list).
-            """
+            prompt = f"Generate exactly 20 multiple-choice questions to test English speakers learning French vocabulary and phrases for the topic: '{topic}'. Return ONLY a valid JSON array of objects, with no markdown formatting, no ```json tags. Each object must have exactly these keys: 'q' (the question in English), 'a' (list of 4 options in French/English), 'c' (the exact correct option from the list)."
             try:
                 response = model.generate_content(prompt)
-                clean_text = response.text.replace("
-```json", "").replace("```", "").strip()
-                st.session_state["quiz_data"] = json.loads(clean_text)[:20]
+                t = response.text.strip()
+                if t.startswith("
+```"):
+                    t = t.split("\n", 1)[1].rsplit("\n", 1)[0]
+                st.session_state["quiz_data"] = json.loads(t.strip())[:20]
             except Exception as e:
                 st.error("AI đang bận một chút, bạn bấm nút Thử lại nhé!")
                 st.session_state["quiz_data"] = None
@@ -71,7 +67,6 @@ if st.button("✨ Generate 20 Questions via AI") or st.session_state["quiz_data"
                 st.success("🎉 Excellent! You passed the vocabulary preparation! The AI Chat Roleplay for this topic is now unlocked below!")
                 st.markdown("### 💬 AI Roleplay Chatbot")
                 st.info(f"AI will now start a conversation with you about '{topic}' using the vocabulary you just practiced!")
-                # Khung chat hội thoại sẽ tự xuất hiện ở đây khi bạn pass bài test
                 st.chat_input("Type your French response here...")
             else:
                 st.error("❌ You need at least 70% to unlock the conversation. Please check your answers and try again!")
