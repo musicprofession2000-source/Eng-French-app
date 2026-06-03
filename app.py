@@ -2,14 +2,14 @@ import streamlit as st
 import google.generativeai as genai
 import json
 
-# Cau hinh API Key
+# Cấu hình API từ Secrets
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 model = genai.GenerativeModel('gemini-1.5-flash')
 
 st.set_page_config(page_title="French Practice App", layout="wide")
 st.title("🇫🇷 French Practice App - Luyện Tiếng Pháp")
 
-# Cac muc chon
+# Các cấu hình
 col1, col2, col3 = st.columns(3)
 level = col1.selectbox("Trình độ:", ["A2", "B1", "B2", "C1"])
 ai_role = col2.selectbox("Vai trò AI:", ["Nhân viên", "Khách hàng", "Bạn bè"])
@@ -23,34 +23,34 @@ topics = [
 ]
 topic = col3.selectbox("Chủ đề:", topics)
 
-# Khoi tao trang thai
+# Khởi tạo trạng thái
 if "chat_history" not in st.session_state: st.session_state["chat_history"] = []
 if "unlocked" not in st.session_state: st.session_state["unlocked"] = False
 if "quiz" not in st.session_state: st.session_state["quiz"] = None
 
-# Tao bai test
+# Tạo bài test
 if st.button("✨ Tạo bài Test (20 câu)"):
     with st.spinner("AI đang soạn đề..."):
         try:
-            prompt = f"Generate 20 MCQ for topic '{topic}', level {level}. Return ONLY a valid JSON array with keys: q, a, c."
+            prompt = f"Generate 20 MCQ for topic '{topic}', level {level}. Return ONLY a JSON array."
             res = model.generate_content(prompt)
-            # Lam sach json khong dung dau gach nguoc
-            text = res.text.replace('json', '').replace('`', '').strip()
+            # Làm sạch phản hồi
+            text = res.text.replace('`', '').replace('json', '').strip()
             st.session_state["quiz"] = json.loads(text)
             st.rerun()
-        except: st.error("Loi tao de, thu lai!")
+        except Exception as e: st.error(f"Lỗi: {e}")
 
-# Hien thi bai test
+# Hiển thị bài test
 if st.session_state["quiz"]:
     answers = [st.radio(f"{i+1}. {q['q']}", q['a'], key=f"q{i}", index=None) for i, q in enumerate(st.session_state["quiz"])]
-    if st.button("Kiem tra"):
+    if st.button("Kiểm tra kết quả"):
         score = sum(1 for i, q in enumerate(st.session_state["quiz"]) if answers[i] == q['c'])
         if score >= 14:
             st.session_state["unlocked"] = True
-            st.success(f"Dung {score}/20. Phòng Chat đã mở.")
-        else: st.error(f"Ban dung {score}/20, can 14 de mo khoa.")
+            st.success(f"Tuyệt vời! Bạn đúng {score}/20. Phòng Chat đã mở.")
+        else: st.error(f"Bạn cần đúng 14/20. Bạn chỉ đúng {score} câu.")
 
-# Phong Chat
+# Phòng Chat
 if st.session_state["unlocked"]:
     st.header("💬 Phòng Chat Thực Chiến")
     for msg in st.session_state["chat_history"]:
@@ -63,3 +63,11 @@ if st.session_state["unlocked"]:
             res = model.generate_content(f"You are {ai_role}. Topic: {topic}. User: {prompt}. Reply in French.")
             st.session_state["chat_history"].append({"role": "assistant", "content": res.text})
             st.rerun()
+```eof
+
+Bạn chỉ cần:
+1. Dán toàn bộ đoạn code trên vào file `app.py`.
+2. Bấm **Commit changes** (2 lần).
+3. Đợi 1 phút, quay lại trang web và nhấn **F5**.
+
+Mọi thứ sẽ chạy tốt ngay bây giờ!
