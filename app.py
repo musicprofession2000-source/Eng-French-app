@@ -5,22 +5,22 @@ from gtts import gTTS
 import io
 
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+# Sử dụng model đúng với quyền truy cập của bạn
 model = genai.GenerativeModel('gemini-2.5-flash')
 
-st.set_page_config(page_title="Apprentissage du Français", layout="wide")
+st.set_page_config(page_title="Lớp học Tiếng Pháp", layout="wide")
 st.title("🇫🇷 Application d'Apprentissage du Français")
 
 # Sidebar
-with st.sidebar:
-    st.header("📚 Dictionnaire")
-    word = st.text_input("Chercher:")
-    if word:
-        try:
-            res = model.generate_content(f"Explique '{word}' en français.")
-            st.info(res.text)
-        except: st.error("Limite atteinte (Quota).")
+st.sidebar.title("📚 Dictionnaire")
+word = st.sidebar.text_input("Chercher un mot:")
+if word:
+    try:
+        res = model.generate_content(f"Explique le mot '{word}' en français simple.")
+        st.sidebar.info(res.text)
+    except: pass
 
-# Settings
+# Cấu hình
 col1, col2, col3 = st.columns(3)
 level = col1.selectbox("Niveau:", ["A2", "B1", "B2", "C1"])
 role = col2.selectbox("Rôle:", ["Employé", "Client", "Ami"])
@@ -35,12 +35,14 @@ if "quiz" not in st.session_state: st.session_state["quiz"] = None
 
 # Quiz
 if st.button("✨ Générer 20 questions"):
-    try:
-        res = model.generate_content(f"Generate 20 MCQ for '{topic}' level {level}. JSON format: [{'q':'...', 'a':['...'], 'c':'...'}]")
-        st.session_state["quiz"] = json.loads(res.text.replace('
-```json', '').replace('```', '').strip())
-        st.rerun()
-    except Exception as e: st.error("Quota atteint ou erreur API. Réessayez plus tard.")
+    with st.spinner("Génération..."):
+        try:
+            prompt = f"Generate 20 MCQ for topic '{topic}' at level {level}. Return ONLY a JSON array with keys: q, a, c."
+            res = model.generate_content(prompt)
+            # Làm sạch JSON an toàn
+            st.session_state["quiz"] = json.loads(res.text.replace('json', '').replace('`', '').strip())
+            st.rerun()
+        except Exception as e: st.error(f"Erreur: {e}")
 
 if st.session_state["quiz"]:
     answers = [st.radio(f"{i+1}. {q['q']}", q['a'], key=f"q{i}", index=None) for i, q in enumerate(st.session_state["quiz"])]
@@ -56,20 +58,18 @@ if st.session_state["unlocked"]:
     for msg in st.session_state["chat"]:
         with st.chat_message(msg["role"]): st.markdown(msg["text"])
     
-    # Ghi âm
     audio = st.audio_input("Parlez (Micro):")
     if audio:
         try:
             transcript = model.generate_content([{"mime_type": "audio/wav", "data": audio.read()}, "Transcribe to French"]).text
             st.session_state["chat"].append({"role": "user", "text": transcript})
             st.rerun()
-        except: st.error("Erreur de transcription.")
+        except: st.error("Erreur.")
     
     if text := st.chat_input("Message..."):
         st.session_state["chat"].append({"role": "user", "text": text})
         st.rerun()
 
-    # AI Phản hồi
     if st.session_state["chat"] and st.session_state["chat"][-1]["role"] == "user":
         try:
             res = model.generate_content(f"Rôle: {role}. Sujet: {topic}. Répondez en français: {st.session_state['chat'][-1]['text']}")
