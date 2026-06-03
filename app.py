@@ -63,11 +63,3 @@ if st.session_state["unlocked"]:
             res = model.generate_content(f"You are {ai_role}. Topic: {topic}. User: {prompt}. Reply in French.")
             st.session_state["chat_history"].append({"role": "assistant", "content": res.text})
             st.rerun()
-```eof
-
-Bạn chỉ cần:
-1. Dán toàn bộ đoạn code trên vào file `app.py`.
-2. Bấm **Commit changes** (2 lần).
-3. Đợi 1 phút, quay lại trang web và nhấn **F5**.
-
-Mọi thứ sẽ chạy tốt ngay bây giờ!
