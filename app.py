@@ -37,8 +37,8 @@ if st.button("✨ Generate 20 Questions via AI") or st.session_state["quiz_data"
             try:
                 response = model.generate_content(prompt)
                 t = response.text.strip()
-                t = t.replace("```json", "").replace("
-```", "").strip()
+                # Cách xử lý mới dùng chuỗi viết liền, loại bỏ hoàn toàn việc ngắt dòng
+                t = t.strip("`").strip("json").strip()
                 st.session_state["quiz_data"] = json.loads(t)[:20]
             except Exception as e:
                 st.error("AI đang bận một chút, bạn bấm nút Thử lại nhé!")
