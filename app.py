@@ -4,11 +4,11 @@ import json
 from gtts import gTTS
 import io
 
+# Cấu hình API
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-# Sử dụng model đúng với quyền truy cập của bạn
 model = genai.GenerativeModel('gemini-2.5-flash')
 
-st.set_page_config(page_title="Lớp học Tiếng Pháp", layout="wide")
+st.set_page_config(page_title="Apprentissage du Français", layout="wide")
 st.title("🇫🇷 Application d'Apprentissage du Français")
 
 # Sidebar
@@ -16,31 +16,35 @@ st.sidebar.title("📚 Dictionnaire")
 word = st.sidebar.text_input("Chercher un mot:")
 if word:
     try:
-        res = model.generate_content(f"Explique le mot '{word}' en français simple.")
+        res = model.generate_content(f"Explique le mot '{word}' en français.")
         st.sidebar.info(res.text)
     except: pass
 
 # Cấu hình
 col1, col2, col3 = st.columns(3)
 level = col1.selectbox("Niveau:", ["A2", "B1", "B2", "C1"])
-role = col2.selectbox("Rôle:", ["Employé", "Client", "Ami"])
-topics = ["Pharmacy", "Interview", "Restaurant", "Airport", "Hotel", "Shopping", "Gym", "Hobbies", "Museum", "Weather",
-          "Directions", "Supermarket", "Doctor", "Bank", "Apartment", "Train", "Post Office", "Clothes", "Library", "Coffee",
-          "Hair Salon", "Trip", "Introduction", "Lost Item", "Art Gallery", "Taxi", "Job Review", "Support", "Birthday", "Dinner Plans"]
+role = col2.selectbox("Rôle de l'IA:", ["Employé", "Client", "Ami"])
+topics = ["At the Pharmacy", "Job Interview", "At the Restaurant", "At the Airport", "Booking a Hotel",
+          "Asking for Directions", "At the Supermarket", "Doctor's Appointment", "At the Bank", "Renting an Apartment",
+          "Buying a Train Ticket", "At the Post Office", "Shopping for Clothes", "At the Gym", "Hobbies",
+          "At the Library", "Ordering Coffee", "At the Hair Salon", "Planning a Trip", "Introducing Yourself",
+          "Reporting a Lost Item", "At the Museum", "Talking about Weather", "Discussing a Movie", "In a Taxi",
+          "Job Review", "Tech Support", "Birthday Party", "Dinner Plans", "Daily Routine"]
 topic = col3.selectbox("Sujet:", topics)
 
 if "chat" not in st.session_state: st.session_state["chat"] = []
 if "unlocked" not in st.session_state: st.session_state["unlocked"] = False
 if "quiz" not in st.session_state: st.session_state["quiz"] = None
 
-# Quiz
+# Quiz - Đã ép AI tạo tiếng Pháp
 if st.button("✨ Générer 20 questions"):
     with st.spinner("Génération..."):
         try:
-            prompt = f"Generate 20 MCQ for topic '{topic}' at level {level}. Return ONLY a JSON array with keys: q, a, c."
+            # Lệnh bằng tiếng Pháp để AI tạo câu hỏi bằng tiếng Pháp
+            prompt = f"Générez 20 questions à choix multiples (MCQ) en FRANÇAIS pour le sujet '{topic}', niveau {level}. Retournez UNIQUEMENT un tableau JSON avec les clés: q, a, c."
             res = model.generate_content(prompt)
-            # Làm sạch JSON an toàn
-            st.session_state["quiz"] = json.loads(res.text.replace('json', '').replace('`', '').strip())
+            text = res.text.replace('json', '').replace('`', '').strip()
+            st.session_state["quiz"] = json.loads(text)
             st.rerun()
         except Exception as e: st.error(f"Erreur: {e}")
 
