@@ -6,17 +6,19 @@ import io
 
 # Setup
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-pro')
 
 st.set_page_config(page_title="French Practice App", layout="wide")
 st.title("🇫🇷 French Practice App")
 
-# Dictionary in Sidebar
-st.sidebar.title("🔍 Dictionary")
+# Sidebar Dictionary
+st.sidebar.title("Dictionary")
 word = st.sidebar.text_input("Look up a word:")
 if word:
-    res = model.generate_content(f"Define '{word}' for French learners with pronunciation and examples.")
-    st.sidebar.info(res.text)
+    try:
+        def_res = model.generate_content(f"Define '{word}' in English and French.")
+        st.sidebar.info(def_res.text)
+    except: pass
 
 # Settings
 col1, col2, col3 = st.columns(3)
@@ -30,55 +32,41 @@ topics = ["At the Pharmacy", "Job Interview", "At the Restaurant", "At the Airpo
           "Job Review", "Tech Support", "Birthday Party", "Dinner Plans", "Daily Routine"]
 topic = col3.selectbox("Topic:", topics)
 
-# Session States
-if "chat" not in st.session_state: st.session_state["chat"] = []
+# State
+if "history" not in st.session_state: st.session_state["history"] = []
 if "unlocked" not in st.session_state: st.session_state["unlocked"] = False
 if "quiz" not in st.session_state: st.session_state["quiz"] = None
 
-# Quiz Generation
-if st.button("✨ Generate 20 Questions"):
-    with st.spinner("Generating..."):
-        prompt = f"Generate 20 MCQ for {topic}, level {level}. Return ONLY a valid JSON array with keys: q, a, c."
+# Quiz
+if st.button("Generate Quiz"):
+    try:
+        prompt = f"Generate 20 MCQ for {topic} at level {level}. Return ONLY a JSON array with keys q, a, c."
         res = model.generate_content(prompt)
-        text = res.text
-        start = text.find('[')
-        end = text.rfind(']') + 1
-        st.session_state["quiz"] = json.loads(text[start:end])
+        text = res.text.replace("json", "").replace("`", "").strip()
+        st.session_state["quiz"] = json.loads(text)
         st.rerun()
+    except Exception as e: st.error(f"Error: {e}")
 
-# Quiz Logic
 if st.session_state["quiz"]:
-    answers = [st.radio(f"{i+1}. {q['q']}", q['a'], key=f"q{i}", index=None) for i, q in enumerate(st.session_state["quiz"])]
-    if st.button("Submit Answers"):
-        if sum(1 for i, q in enumerate(st.session_state["quiz"]) if answers[i] == q['c']) >= 14:
+    answers = [st.radio(f"{q['q']}", q['a'], key=f"q{i}", index=None) for i, q in enumerate(st.session_state["quiz"])]
+    if st.button("Submit"):
+        score = sum(1 for i, q in enumerate(st.session_state["quiz"]) if answers[i] == q['c'])
+        if score >= 14:
             st.session_state["unlocked"] = True
             st.success("Chat Unlocked!")
-        else: st.error("Need 14/20 to unlock.")
+        else: st.error("Need 14 correct.")
 
 # Chat
 if st.session_state["unlocked"]:
-    st.header("💬 Chat Room")
-    for msg in st.session_state["chat"]:
-        with st.chat_message(msg["role"]): st.markdown(msg["text"])
+    st.header("Chat Room")
+    for msg in st.session_state["history"]:
+        with st.chat_message(msg["role"]): st.markdown(msg["content"])
     
-    # Voice Input
-    audio = st.audio_input("Speak French:")
-    if audio:
-        transcript = model.generate_content([{"mime_type": "audio/wav", "data": audio.read()}, "Transcribe to French text only"]).text
-        st.session_state["chat"].append({"role": "user", "text": transcript})
-        st.rerun()
-
-    # Text Input
-    if text := st.chat_input("Enter message..."):
-        st.session_state["chat"].append({"role": "user", "text": text})
-        st.rerun()
-
-    # AI Reply
-    if st.session_state["chat"] and st.session_state["chat"][-1]["role"] == "user":
-        res = model.generate_content(f"Role: {role}. Topic: {topic}. Reply to: {st.session_state['chat'][-1]['text']}")
-        st.session_state["chat"].append({"role": "assistant", "text": res.text})
-        tts = gTTS(res.text, lang='fr')
-        f = io.BytesIO()
-        tts.write_to_fp(f)
-        st.audio(f.getvalue(), format='audio/mp3')
-        st.rerun()
+    # Text input
+    if prompt := st.chat_input("Message:"):
+        st.session_state["history"].append({"role": "user", "content": prompt})
+        with st.chat_message("user"): st.markdown(prompt)
+        with st.chat_message("assistant"):
+            res = model.generate_content(f"Role: {role}. Topic: {topic}. User said: {prompt}. Reply in French.")
+            st.session_state["history"].append({"role": "assistant", "content": res.text})
+            st.rerun()
