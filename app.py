@@ -1,66 +1,73 @@
 import streamlit as st
 import google.generativeai as genai
 import json
+from gtts import gTTS
+import io
 
-# Configure API
+# 1. Cấu hình
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-model = genai.GenerativeModel('gemini-pro')
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 st.set_page_config(page_title="French Practice App", layout="wide")
 st.title("🇫🇷 French Practice App")
 
-# Settings
-col1, col2, col3 = st.columns(3)
-level = col1.selectbox("Level:", ["A2", "B1", "B2", "C1"])
-ai_role = col2.selectbox("Role:", ["Staff", "Customer", "Friend"])
-topics = [
-    "At the Pharmacy", "Job Interview", "At the Restaurant", "At the Airport", "Booking a Hotel",
-    "Asking for Directions", "At the Supermarket", "Doctor's Appointment", "At the Bank", "Renting an Apartment",
-    "Buying a Train Ticket", "At the Post Office", "Shopping for Clothes", "At the Gym", "Hobbies",
-    "At the Library", "Ordering Coffee", "At the Hair Salon", "Planning a Trip", "Introducing Yourself",
-    "Reporting a Lost Item", "At the Museum", "Talking about Weather", "Discussing a Movie", "In a Taxi",
-    "Job Review", "Tech Support", "Birthday Party", "Dinner Plans", "Daily Routine"
-]
-topic = col3.selectbox("Topic:", topics)
+# 2. Sidebar Từ điển
+st.sidebar.title("🔍 Từ điển AI")
+word = st.sidebar.text_input("Tra từ:")
+if word:
+    res = model.generate_content(f"Define '{word}' for French learners. Provide meaning, pronunciation, examples.")
+    st.sidebar.info(res.text)
 
-# Session State
-if "chat_history" not in st.session_state: st.session_state["chat_history"] = []
-if "unlocked" not in st.session_state: st.session_state["unlocked"] = False
+# 3. Cấu hình chính
+c1, c2, c3 = st.columns(3)
+level = c1.selectbox("Trình độ:", ["A2", "B1", "B2", "C1"])
+role = c2.selectbox("Vai trò:", ["Nhân viên", "Khách hàng", "Bạn bè"])
+topics = ["At the Pharmacy", "Job Interview", "At the Restaurant", "Booking a Hotel"]
+topic = c3.selectbox("Chủ đề:", topics)
+
+# Trạng thái
 if "quiz" not in st.session_state: st.session_state["quiz"] = None
+if "unlocked" not in st.session_state: st.session_state["unlocked"] = False
+if "chat" not in st.session_state: st.session_state["chat"] = []
 
-# Quiz
-if st.button("✨ Generate 20 Questions"):
-    with st.spinner("Generating..."):
-        try:
-            prompt = f"Generate 20 MCQ for topic '{topic}', level {level}. Return ONLY a JSON array with keys q, a, c."
-            res = model.generate_content(prompt)
-            clean_text = res.text.replace('
-```json', '').replace('```', '').strip()
-            st.session_state["quiz"] = json.loads(clean_text)
-            st.rerun()
-        except Exception as e:
-            st.error(f"Error: {e}")
+# 4. Quiz
+if st.button("✨ Tạo bài Test"):
+    res = model.generate_content(f"Generate 20 MCQ for {topic}, level {level}. Return raw JSON array [{{'q':'...','a':['...'],'c':'...'}}]")
+    st.session_state["quiz"] = json.loads(res.text.replace('
+```json','').replace('```','').strip())
+    st.rerun()
 
 if st.session_state["quiz"]:
-    answers = [st.radio(f"{i+1}. {q['q']}", q['a'], key=f"q{i}", index=None) for i, q in enumerate(st.session_state["quiz"])]
-    if st.button("Submit Answers"):
-        score = sum(1 for i, q in enumerate(st.session_state["quiz"]) if answers[i] == q['c'])
-        if score >= 14:
+    answers = [st.radio(q['q'], q['a'], key=f"q{i}", index=None) for i, q in enumerate(st.session_state["quiz"])]
+    if st.button("Submit"):
+        if sum(1 for i, q in enumerate(st.session_state["quiz"]) if answers[i] == q['c']) >= 14:
             st.session_state["unlocked"] = True
-            st.success(f"Score: {score}/20. Chat unlocked!")
-        else:
-            st.error(f"Score: {score}/20. Need 14 to unlock.")
+            st.success("Mở khóa Chat!")
 
-# Chat
+# 5. Chat & Voice
 if st.session_state["unlocked"]:
-    st.header("💬 AI Chat")
-    for msg in st.session_state["chat_history"]:
-        with st.chat_message(msg["role"]): st.markdown(msg["content"])
-        
-    if prompt := st.chat_input("Enter your message..."):
-        st.session_state["chat_history"].append({"role": "user", "content": prompt})
-        with st.chat_message("user"): st.markdown(prompt)
-        with st.chat_message("assistant"):
-            res = model.generate_content(f"Role: {ai_role}. Topic: {topic}. User: {prompt}. Reply in French.")
-            st.session_state["chat_history"].append({"role": "assistant", "content": res.text})
-            st.rerun()
+    st.header("💬 Phòng Chat")
+    for msg in st.session_state["chat"]:
+        with st.chat_message(msg["role"]): st.write(msg["text"])
+    
+    # Ghi âm
+    audio = st.audio_input("Nói tiếng Pháp:")
+    if audio:
+        st.info("Đang xử lý giọng nói...")
+        transcript = model.generate_content([{"mime_type": "audio/wav", "data": audio.read()}, "Transcribe to text"]).text
+        st.session_state["chat"].append({"role": "user", "text": transcript})
+    
+    # Nhập text
+    if text := st.chat_input("Hoặc gõ tin nhắn..."):
+        st.session_state["chat"].append({"role": "user", "text": text})
+
+    # AI trả lời
+    if st.session_state["chat"] and st.session_state["chat"][-1]["role"] == "user":
+        res = model.generate_content(f"Role: {role}. Topic: {topic}. Reply to: {st.session_state['chat'][-1]['text']}")
+        st.session_state["chat"].append({"role": "assistant", "text": res.text})
+        # Phát âm
+        tts = gTTS(res.text, lang='fr')
+        f = io.BytesIO()
+        tts.write_to_fp(f)
+        st.audio(f.getvalue(), format='audio/mp3')
+        st.rerun()
