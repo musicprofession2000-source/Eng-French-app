@@ -17,11 +17,13 @@ with st.sidebar:
         st.session_state.quiz = None
         st.rerun()
 
-# 1. Generate Quiz (Prompt hoàn toàn bằng tiếng Anh)
+# 1. Generate Quiz (Đã sửa cú pháp dấu ngoặc)
 if st.button("✨ Generate Quiz"):
-    prompt = f"Create 5 French MCQ for topic '{topic}' at level {level}. Return ONLY valid JSON format: [{'q': 'Question', 'a': ['A', 'B', 'C', 'D'], 'c': 'Correct answer'}]"
+    # Dùng {{ và }} để thoát dấu ngoặc, giúp Python không hiểu nhầm
+    prompt = f"Create 5 French MCQ for topic '{topic}' at level {level}. Return ONLY valid JSON format: [{{'q': 'Question', 'a': ['A', 'B', 'C', 'D'], 'c': 'Correct answer'}}]"
     res = model.generate_content(prompt)
-    # Loại bỏ các ký tự Markdown không cần thiết để tránh lỗi JSON
+    
+    # Làm sạch chuỗi trước khi chuyển sang JSON
     clean_text = res.text.replace('json', '').replace('```', '').strip()
     st.session_state.quiz = json.loads(clean_text)
     st.rerun()
@@ -37,7 +39,7 @@ if "quiz" in st.session_state and st.session_state.quiz:
         st.write(f"### Score: {score}/5")
         st.session_state.chat_active = True
 
-# 3. Text-only Chat
+# 3. Chat
 if st.session_state.get("chat_active", False):
     st.markdown("---")
     st.header("💬 Chat with AI Teacher")
@@ -48,7 +50,6 @@ if st.session_state.get("chat_active", False):
     
     if text := st.chat_input("Type your message in French..."):
         st.session_state.messages.append({"role": "user", "text": text})
-        # AI prompt chỉ dùng tiếng Anh
-        res = model.generate_content(f"You are a French teacher. Correct the user's French and reply in French. User input: {text}")
+        res = model.generate_content(f"You are a French teacher. Reply in French: {text}")
         st.session_state.messages.append({"role": "assistant", "text": res.text})
         st.rerun()
