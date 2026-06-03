@@ -16,7 +16,7 @@ st.sidebar.title("📚 Dictionnaire")
 word = st.sidebar.text_input("Chercher un mot:")
 if word:
     try:
-        res = model.generate_content(f"Définis le mot '{word}' pour un apprenant de français.")
+        res = model.generate_content(f"Explique le mot '{word}' en français simple avec des exemples.")
         st.sidebar.info(res.text)
     except: pass
 
@@ -25,23 +25,19 @@ col1, col2, col3 = st.columns(3)
 level = col1.selectbox("Niveau:", ["A2", "B1", "B2", "C1"])
 role = col2.selectbox("Rôle de l'IA:", ["Employé", "Client", "Ami"])
 topics = ["At the Pharmacy", "Job Interview", "At the Restaurant", "At the Airport", "Booking a Hotel",
-          "Asking for Directions", "At the Supermarket", "Doctor's Appointment", "At the Bank", "Renting an Apartment",
-          "Buying a Train Ticket", "At the Post Office", "Shopping for Clothes", "At the Gym", "Hobbies",
-          "At the Library", "Ordering Coffee", "At the Hair Salon", "Planning a Trip", "Introducing Yourself",
-          "Reporting a Lost Item", "At the Museum", "Talking about Weather", "Discussing a Movie", "In a Taxi",
-          "Job Review", "Tech Support", "Birthday Party", "Dinner Plans", "Daily Routine"]
+          "Asking for Directions", "At the Supermarket", "Doctor's Appointment", "At the Bank", "Renting an Apartment"]
 topic = col3.selectbox("Sujet:", topics)
 
-# Trạng thái
 if "chat" not in st.session_state: st.session_state["chat"] = []
 if "unlocked" not in st.session_state: st.session_state["unlocked"] = False
 if "quiz" not in st.session_state: st.session_state["quiz"] = None
 
-# Quiz
-if st.button("✨ Générer 20 questions"):
-    with st.spinner("Génération en cours..."):
+# Quiz (đã sửa lệnh để bắt AI viết tiếng Pháp)
+if st.button("✨ Générer 20 questions (en français)"):
+    with st.spinner("Génération..."):
         try:
-            prompt = f"Generate 20 MCQ for topic '{topic}', level {level}. Return ONLY a JSON array with keys q, a, c."
+            # Lệnh bắt buộc AI phải viết hoàn toàn bằng tiếng Pháp
+            prompt = f"Générez 20 questions à choix multiples pour le sujet '{topic}', niveau {level}. TOUTES les questions et réponses doivent être en FRANÇAIS. Retournez UNIQUEMENT un tableau JSON avec les clés: q, a, c."
             res = model.generate_content(prompt)
             text = res.text.replace('json', '').replace('`', '').strip()
             st.session_state["quiz"] = json.loads(text)
@@ -50,7 +46,7 @@ if st.button("✨ Générer 20 questions"):
 
 if st.session_state["quiz"]:
     answers = [st.radio(f"{i+1}. {q['q']}", q['a'], key=f"q{i}", index=None) for i, q in enumerate(st.session_state["quiz"])]
-    if st.button("Soumettre les réponses"):
+    if st.button("Soumettre"):
         if sum(1 for i, q in enumerate(st.session_state["quiz"]) if answers[i] == q['c']) >= 14:
             st.session_state["unlocked"] = True
             st.success("Accès au Chat débloqué !")
@@ -58,7 +54,7 @@ if st.session_state["quiz"]:
 
 # Chat
 if st.session_state["unlocked"]:
-    st.header("💬 Salle de Chat")
+    st.header("💬 Salle de Chat & Voix")
     for msg in st.session_state["chat"]:
         with st.chat_message(msg["role"]): st.markdown(msg["text"])
     
