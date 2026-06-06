@@ -7,8 +7,9 @@ st.title("🇫🇷 French Practice App")
 
 # Cấu hình API key
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-# Đổi model sang tên này cho ổn định
-model = genai.GenerativeModel('gemini-1.5-flash')
+
+# Đổi sang model 'gemini-1.0-pro' - đây là model cực kỳ phổ biến và dễ dùng
+model = genai.GenerativeModel('gemini-1.0-pro')
 
 # 2. Khởi tạo trạng thái
 if "step" not in st.session_state: st.session_state.step = "config"
@@ -34,8 +35,8 @@ with st.sidebar:
 # 4. Logic
 if st.session_state.step == "config":
     if st.button("Generate Vocabulary Warm-up"):
-        # Thử gọi model đơn giản hơn
-        prompt = f"Provide 5 essential phrases for topic '{topic}' at level {level}. Format: Phrase - Meaning - Example."
+        # Sử dụng model.generate_content đơn giản nhất
+        prompt = f"Provide 5 essential French phrases for topic '{topic}' at level {level}. Format: Phrase - Meaning - Example."
         res = model.generate_content(prompt)
         st.session_state.vocab = res.text
         st.session_state.step = "warmup"
@@ -52,6 +53,7 @@ elif st.session_state.step == "chat":
     st.header(f"💬 Conversation: {topic}")
     if not st.session_state.messages:
         st.session_state.messages = [{"role": "assistant", "content": "Bonjour! Let's practice."}]
+    
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]): st.write(msg["content"])
     
