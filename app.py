@@ -1,76 +1,59 @@
 import streamlit as st
 import google.generativeai as genai
 
-# Cấu hình trang
 st.set_page_config(page_title="French Practice App", layout="wide")
 st.title("🇫🇷 French Practice App")
 
-# 1. Kiểm tra API Key và kết nối (Đảm bảo không bị lỗi xác thực 401)
-try:
-    if "GEMINI_API_KEY" not in st.secrets:
-        st.error("LỖI: Bạn chưa dán GEMINI_API_KEY vào phần Secrets của Streamlit!")
-        st.stop()
-    
-    # Lấy key và cấu hình
-    api_key = st.secrets["GEMINI_API_KEY"].strip()
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-1.5-flash')
-except Exception as e:
-    st.error(f"Lỗi khởi tạo API: {e}")
+# 1. Cấu hình API Key
+if "GEMINI_API_KEY" not in st.secrets:
+    st.error("Lỗi: Chưa tìm thấy 'GEMINI_API_KEY' trong phần Secrets.")
     st.stop()
 
-# 2. Khởi tạo trạng thái ứng dụng
+try:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"].strip())
+    # Sử dụng model 'gemini-1.0-pro' thay vì flash để tránh lỗi 404
+    model = genai.GenerativeModel('gemini-1.0-pro') 
+except Exception as e:
+    st.error(f"Lỗi khởi tạo AI: {e}")
+    st.stop()
+
+# 2. Khởi tạo trạng thái
 if "step" not in st.session_state: st.session_state.step = "config"
 if "messages" not in st.session_state: st.session_state.messages = []
-if "vocab" not in st.session_state: st.session_state.vocab = ""
 
-# 3. Sidebar (Cấu hình)
+# 3. Sidebar
 with st.sidebar:
-    st.header("Settings")
-    level = st.selectbox("Select Level:", ["A2", "B1", "B2", "C1"])
-    topics = ["Pharmacy", "Interview", "Restaurant", "Airport", "Hotel", "Shopping", "Transportation", "Bank", "Hospital", "School"]
-    topic = st.selectbox("Select Topic:", topics)
-    role = st.text_input("Enter your role:")
-    if st.button("Reset Session"):
-        st.session_state.clear()
-        st.rerun()
+    level = st.selectbox("Level:", ["A2", "B1", "B2", "C1"])
+    topic = st.selectbox("Topic:", ["Restaurant", "Hotel", "Airport", "Shopping"])
+    role = st.text_input("Your role:")
 
-# 4. Các bước thực hiện
+# 4. Logic
 if st.session_state.step == "config":
-    if st.button("Generate Vocabulary Warm-up"):
-        with st.spinner('AI is generating phrases...'):
-            try:
-                # Prompt đơn giản để tránh lỗi định dạng
-                prompt = f"Provide 5 essential French phrases for topic '{topic}' at level {level}. Meaning in English and short example."
-                res = model.generate_content(prompt)
-                st.session_state.vocab = res.text
-                st.session_state.step = "warmup"
-                st.rerun()
-            except Exception as e:
-                st.error(f"Lỗi khi gọi AI: {e}. (Lưu ý: Nếu lỗi 401, hãy kiểm tra lại Key trong Secrets!)")
+    if st.button("Generate Vocabulary"):
+        try:
+            prompt = f"Give 5 essential French phrases for {topic} ({level}). Format: Phrase - Meaning."
+            response = model.generate_content(prompt)
+            st.session_state.vocab = response.text
+            st.session_state.step = "warmup"
+            st.rerun()
+        except Exception as e:
+            st.error(f"Lỗi gọi AI: {e}")
 
 elif st.session_state.step == "warmup":
-    st.subheader(f"💡 Vocabulary for {topic}")
     st.write(st.session_state.vocab)
-    if st.button("Start Conversation"):
+    if st.button("Start Chat"):
         st.session_state.step = "chat"
         st.rerun()
 
 elif st.session_state.step == "chat":
-    st.header(f"💬 Chat with AI")
-    if not st.session_state.messages:
-        st.session_state.messages = [{"role": "assistant", "content": f"Bonjour! You are a {role}. Let's discuss {topic}."}]
-    
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]): st.write(msg["content"])
-    
-    if prompt := st.chat_input("Type your message..."):
+    if prompt := st.chat_input("Message:"):
         st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"): st.write(prompt)
-        
         try:
-            res = model.generate_content(f"Topic: {topic}. Role: {role}. User: {prompt}. Reply in French.")
+            res = model.generate_content(f"Role: {role}. Reply in French: {prompt}")
             st.session_state.messages.append({"role": "assistant", "content": res.text})
             st.rerun()
         except Exception as e:
-            st.error(f"Lỗi khi chat: {e}")
+            st.error(f"Lỗi chat: {e}")
+
+    for msg in st.session_state.messages:
+        st.chat_message(msg["role"]).write(msg["content"])
