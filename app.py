@@ -1,55 +1,68 @@
 import streamlit as st
 import google.generativeai as genai
-import json
 
-# Setup
+# 1. Cấu hình
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-model = genai.GenerativeModel('gemini-2.5-flash')
+model = genai.GenerativeModel('gemini-2.0-flash')
 
 st.set_page_config(page_title="French Practice App", layout="wide")
 st.title("🇫🇷 French Practice App")
 
-# Sidebar
+# 2. Khởi tạo trạng thái ứng dụng
+if "step" not in st.session_state: st.session_state.step = "config"
+if "messages" not in st.session_state: st.session_state.messages = []
+
+# Danh sách 30 chủ đề
+topics = [
+    "Pharmacy", "Interview", "Restaurant", "Airport", "Hotel", "Shopping", 
+    "Transportation", "Bank", "Hospital", "School", "Supermarket", "Tourism",
+    "Office", "Weather", "Family", "Hobbies", "Cooking", "Technology",
+    "Fashion", "Sports", "Cinema", "Health", "Art", "Music", "Environment",
+    "Politics", "History", "Science", "Education", "Real Estate"
+]
+
+# 3. Giao diện Sidebar
 with st.sidebar:
-    level = st.selectbox("Level:", ["A2", "B1", "B2", "C1"])
-    topic = st.selectbox("Topic:", ["Pharmacy", "Interview", "Restaurant", "Airport", "Hotel"])
-    if st.button("Reset Quiz"):
-        st.session_state.quiz = None
+    st.header("Settings")
+    level = st.selectbox("Select Level:", ["A2", "B1", "B2", "C1"])
+    topic = st.selectbox("Select Topic:", topics)
+    role = st.text_input("Enter your role (e.g., Client, Student):")
+    
+    if st.button("Reset App"):
+        st.session_state.clear()
         st.rerun()
 
-# 1. Generate Quiz (Đã sửa cú pháp dấu ngoặc)
-if st.button("✨ Generate Quiz"):
-    # Dùng {{ và }} để thoát dấu ngoặc, giúp Python không hiểu nhầm
-    prompt = f"Create 5 French MCQ for topic '{topic}' at level {level}. Return ONLY valid JSON format: [{{'q': 'Question', 'a': ['A', 'B', 'C', 'D'], 'c': 'Correct answer'}}]"
-    res = model.generate_content(prompt)
-    
-    # Làm sạch chuỗi trước khi chuyển sang JSON
-    clean_text = res.text.replace('json', '').replace('```', '').strip()
-    st.session_state.quiz = json.loads(clean_text)
-    st.rerun()
+# 4. Logic theo từng bước
+if st.session_state.step == "config":
+    if st.button("Generate Vocabulary Warm-up"):
+        prompt = f"Act as a French teacher. Provide 5 essential phrases for topic '{topic}' at level {level}. Format: Phrase - Meaning - Example."
+        res = model.generate_content(prompt)
+        st.session_state.vocab = res.text
+        st.session_state.step = "warmup"
+        st.rerun()
 
-# 2. Display Quiz
-if "quiz" in st.session_state and st.session_state.quiz:
-    ans = {}
-    for i, q in enumerate(st.session_state.quiz):
-        ans[i] = st.radio(f"{i+1}. {q['q']}", q['a'], key=f"q{i}", index=None)
-    
-    if st.button("Check Answers"):
-        score = sum(1 for i, q in enumerate(st.session_state.quiz) if ans[i] == q['c'])
-        st.write(f"### Score: {score}/5")
-        st.session_state.chat_active = True
+elif st.session_state.step == "warmup":
+    st.subheader(f"💡 Vocabulary for {topic}")
+    st.write(st.session_state.vocab)
+    if st.button("Start Conversation"):
+        st.session_state.step = "chat"
+        st.rerun()
 
-# 3. Chat
-if st.session_state.get("chat_active", False):
-    st.markdown("---")
-    st.header("💬 Chat with AI Teacher")
-    if "messages" not in st.session_state: st.session_state.messages = []
+elif st.session_state.step == "chat":
+    st.header(f"💬 Conversation: {topic}")
+    if not st.session_state.messages:
+        st.session_state.messages = [{"role": "assistant", "content": f"Bonjour! Let's practice. You are a {role}. How can I help you?"}]
     
     for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]): st.write(msg["text"])
+        with st.chat_message(msg["role"]): st.write(msg["content"])
     
-    if text := st.chat_input("Type your message in French..."):
-        st.session_state.messages.append({"role": "user", "text": text})
-        res = model.generate_content(f"You are a French teacher. Reply in French: {text}")
-        st.session_state.messages.append({"role": "assistant", "text": res.text})
+    if prompt := st.chat_input("Type your message in French..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"): st.write(prompt)
+        
+        # AI Phản hồi
+        ai_prompt = f"Role: {role}. Topic: {topic}. Level: {level}. User said: {prompt}. Reply in French."
+        res = model.generate_content(ai_prompt)
+        
+        st.session_state.messages.append({"role": "assistant", "content": res.text})
         st.rerun()
